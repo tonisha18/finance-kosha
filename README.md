@@ -10,7 +10,7 @@ An active, AI-powered personal finance coach. Upload a messy bank statement and 
 
 ## Features
 
-| Area | What it does |
+| Area | What it does
 |---|---|
 | **Statement import** | Upload `.pdf`, `.xlsx`, `.csv` or paste transaction SMS. Parsed in memory, never stored. |
 | **Privacy firewall** | Account numbers, IFSC codes, phone numbers, emails, PAN and card numbers are redacted before any AI call. |
