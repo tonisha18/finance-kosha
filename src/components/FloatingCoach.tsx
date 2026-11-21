@@ -24,10 +24,6 @@ export function FloatingCoach() {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  if (pathname === "/login" || pathname === "/signup") {
-    return null;
-  }
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -35,6 +31,10 @@ export function FloatingCoach() {
   useEffect(() => {
     if (open) scrollToBottom();
   }, [messages, open]);
+
+  if (pathname === "/login" || pathname === "/signup") {
+    return null;
+  }
 
   const handleSend = async (textToSend?: string) => {
     const text = textToSend || input;

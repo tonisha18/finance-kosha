@@ -4,13 +4,13 @@ An active, AI-powered personal finance coach. Upload a messy bank statement and 
 
 > Built for the Product Space problem statement "Personal finance coach with a living money model".
 
-**Live demo:** `<your-vercel-url>`  |  **Repo:** `<your-repo-url>`
+**Repo:** <your-repo-url>
 
 ---
 
 ## Features
 
-| Area | What it does
+| Area | What it does |
 |---|---|
 | **Statement import** | Upload `.pdf`, `.xlsx`, `.csv` or paste transaction SMS. Parsed in memory, never stored. |
 | **Privacy firewall** | Account numbers, IFSC codes, phone numbers, emails, PAN and card numbers are redacted before any AI call. |
@@ -31,7 +31,6 @@ An active, AI-powered personal finance coach. Upload a messy bank statement and 
 - **AI:** Google Gemini, called only from server routes with structured, validated JSON output
 - **Parsing:** pdf-parse, SheetJS (xlsx), papaparse
 - **Validation and tests:** Zod, Vitest
-- **Hosting:** Vercel
 
 ## How it works
 
@@ -89,7 +88,7 @@ or by pasting each file into the Supabase **SQL Editor** and running it:
 In the Supabase dashboard, go to **Authentication**:
 
 - For a quick demo, turn off "Confirm email" (Sign In / Providers, Email).
-- Under **URL Configuration**, set **Site URL** to `http://localhost:3000` for local work (you will add the Vercel URL later).
+- Under **URL Configuration**, set **Site URL** to `http://localhost:3000` and add `http://localhost:3000/**` to the **Redirect URLs**.
 
 ### 4. Set environment variables
 
@@ -116,13 +115,24 @@ openssl rand -hex 32
 
 Never commit `.env.local`. Never put a secret in a variable that starts with `NEXT_PUBLIC_`.
 
-### 5. Run it
+### 5. How to view this locally
+
+**Development mode** (hot reload, best for working on the app):
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`, sign up, and either upload a statement or use **Settings, Load demo data**.
+Open [http://localhost:3000](http://localhost:3000), sign up, and either upload a statement or use **Settings, Load demo data**.
+
+**Production build** (to check the app compiles and to see how it behaves when optimized):
+
+```bash
+npm run build
+npm run start
+```
+
+`npm run build` creates the optimized production build and will surface any type or lint errors. `npm run start` then serves that build at [http://localhost:3000](http://localhost:3000). Run `npm run build` again after any code change or any `NEXT_PUBLIC_*` environment variable change, because those values are set at build time.
 
 ### 6. Run the tests
 
@@ -151,60 +161,30 @@ Suggested order: import A, re-import A (expect zero new rows), then B and C. Use
 
 ---
 
-## Deploying to Vercel
+## Verify your local setup
 
-### 1. Push the code to GitHub
+- [ ] Sign up and log in at `http://localhost:3000`
+- [ ] Upload `quick_test_2_edge_cases.xlsx` and see: 12 inserted, 3 dropped
+- [ ] Re-upload the same file and see zero new rows
+- [ ] Fix a category and see the rule apply to similar transactions
+- [ ] Open the Coach, ask for a stock tip, and see the polite refusal
+- [ ] In the browser DevTools Network tab, confirm no API key appears in any request or response
+
+## Daily job (optional)
+
+The app has a protected endpoint, `/api/cron/daily`, that refreshes alerts for all users and generates monthly reports on the 1st. It is not scheduled automatically when running locally, but you can trigger it by hand:
 
 ```bash
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin <your-repo-url>
-git push -u origin main
+curl -i -H "Authorization: Bearer <your-CRON_SECRET>" http://localhost:3000/api/cron/daily
 ```
 
-Confirm `.env.local` is not in the repo.
+Calling it without the header should return `401`:
 
-### 2. Import the project
-
-1. Go to [vercel.com/new](https://vercel.com/new) and import the GitHub repository.
-2. Framework preset: **Next.js** (auto-detected). Leave build and output settings at their defaults.
-
-### 3. Add environment variables
-
-In **Project Settings, Environment Variables**, add every variable from the table above for the **Production** environment (and Preview if you use preview deployments):
-
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `CRON_SECRET`, `NEXT_PUBLIC_DEMO_MODE`
-
-Then click **Deploy**. Variables that start with `NEXT_PUBLIC_` are baked in at build time, so redeploy after changing them.
-
-### 4. Point Supabase Auth at your Vercel URL
-
-In Supabase, **Authentication, URL Configuration**:
-
-- **Site URL:** `https://<your-project>.vercel.app`
-- **Redirect URLs:** add `https://<your-project>.vercel.app/**` (and `http://localhost:3000/**` for local work)
-
-Without this, sign-in redirects can fail in production.
-
-### 5. Set up the daily job
-
-The app has a protected endpoint, `/api/cron/daily`, that refreshes alerts for all users and generates monthly reports on the 1st. Add a `vercel.json` at the repo root:
-
-```json
-{
-  "crons": [
-    { "path": "/api/cron/daily", "schedule": "30 3 * * *" }
-  ]
-}
+```bash
+curl -i http://localhost:3000/api/cron/daily
 ```
 
-`30 3 * * *` runs at 03:30 UTC, which is 09:00 IST.
-
-How it is secured:
-
-- When `CRON_SECRET` is set, Vercel sends it automatically as `Authorization: Bearer <CRON_SECRET>` on a `GET` request.
-- Make sure the route is a `GET` handler and checks that exact header, and rejects the request if the secret is missing:
+The route must be a `GET` handler and must reject requests when the secret is missing or does not match:
 
 ```ts
 export async function GET(request: Request) {
@@ -216,40 +196,7 @@ export async function GET(request: Request) {
 }
 ```
 
-Notes:
-
-- Cron jobs run only on the production deployment, and are not triggered by `next dev`. To test locally, call the route yourself with the header.
-- On the Hobby plan, cron jobs are limited in frequency (once per day) and in number, so keep it to one daily job.
-- Even without cron, alerts still refresh after every import and when the dashboard is opened, so the app works if you skip this step.
-
-### 6. Allow enough time for imports
-
-Parsing and AI categorization can take longer than the default function timeout. In the import route (`app/api/ingest/route.ts`), set:
-
-```ts
-export const maxDuration = 60;
-```
-
-The maximum allowed depends on your Vercel plan, so check the current limits in the Vercel docs. If imports time out, the staged progress screen will show an error and offer a retry.
-
-**Request size:** Vercel Functions limit the size of a request body (around 4.5 MB at the time of writing, check the docs). If large statements fail to upload in production, keep test files small or lower the app's file-size limit to match.
-
-### 7. Verify the deployment
-
-- [ ] Sign up and log in on the live URL
-- [ ] Upload `quick_test_2_edge_cases.xlsx` and see: 12 inserted, 3 dropped
-- [ ] Re-upload the same file and see zero new rows
-- [ ] Fix a category and see the rule apply to similar transactions
-- [ ] Open the Coach, ask for a stock tip, and see the polite refusal
-- [ ] In the browser DevTools Network tab, confirm no API key appears in any request or response
-- [ ] Call the cron route without the header and confirm it returns 401:
-  ```bash
-  curl -i https://<your-project>.vercel.app/api/cron/daily
-  ```
-
-### Updating the live app
-
-Every push to `main` triggers a new production deployment. Pull requests get preview URLs (add them to the Supabase Redirect URLs if you want to log in on previews).
+Even without the daily job, alerts still refresh after every import and when the dashboard is opened, so the app works fine if you skip this.
 
 ---
 
@@ -257,15 +204,13 @@ Every push to `main` triggers a new production deployment. Pull requests get pre
 
 | Problem | Likely cause and fix |
 |---|---|
-| Login redirects to the wrong place in production | Supabase Site URL or Redirect URLs still point to localhost. Update them (step 4). |
-| "Invalid API key" or empty data | A Supabase env var is missing or wrong in Vercel. Fix it and redeploy. |
-| Import works locally but times out on Vercel | Increase `maxDuration` on the ingest route, or try a smaller file. |
-| Large upload fails only in production | Request body size limit on Vercel Functions. Use a smaller file. |
+| Login redirects to the wrong place | Supabase Site URL or Redirect URLs do not match `http://localhost:3000`. Update them (step 3). |
+| "Invalid API key" or empty data | A Supabase env var is missing or wrong in `.env.local`. Fix it and restart `npm run dev`. |
 | Coach or alerts show template text instead of AI text | `GEMINI_API_KEY` missing or rate-limited. The app falls back to template copy by design. |
 | Users see each other's data | Migrations not applied or RLS disabled. Re-run both migration files and the RLS test. |
-| Cron job never runs | It runs only on production, needs `vercel.json` committed, and a daily schedule on Hobby. |
 | Scanned PDF rejected | Image-only PDFs are not supported. Upload the CSV or XLSX export instead. |
-| `NEXT_PUBLIC_*` change has no effect | Those values are set at build time. Redeploy. |
+| `NEXT_PUBLIC_*` change has no effect | Restart `npm run dev`, or re-run `npm run build` if you are using the production build. |
+| `npm run build` fails | Read the first error in the output. Most often it is a TypeScript error or a missing env var. |
 
 ## Three-minute demo script
 
@@ -283,9 +228,7 @@ Every push to `main` triggers a new production deployment. Pull requests get pre
 - Scanned (image-only) PDFs are not supported; use CSV or XLSX.
 - SMS parsing covers common Indian bank and UPI formats; unusual formats fall back to the LLM.
 - Auto-categorization is probabilistic; low-confidence rows are flagged for review.
-- Cron frequency on Vercel's free plan is limited to once per day.
 
 ## Disclaimer
 
 MoneyModel Coach provides educational cash-flow guidance only. It is not financial, investment, tax or legal advice, and it does not recommend specific stocks, mutual funds, ETFs, crypto assets, fixed deposits or insurance products.
-
